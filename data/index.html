@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>ESP8266 Controller</title><link rel="stylesheet" href="/style.css"></head>
+<body><header><div><h1>ESP8266 Controller</h1><p id="net">Connecting…</p></div><span id="mqtt" class="pill">MQTT offline</span></header>
+<main><section><h2>IO Dashboard</h2><div id="ioGrid" class="grid"></div></section>
+<section><h2>Wi-Fi & MQTT / WSS Settings</h2><p class="hint">Host, port, path, credentials, Client ID and topics are editable here. Password inputs are write-only; leave blank to retain the saved value.</p>
+<form id="settings"><div class="cols">
+<label>Wi-Fi SSID<input name="wifiSsid" maxlength="32"></label><label>Wi-Fi password<input name="wifiPassword" type="password" maxlength="64" autocomplete="new-password" placeholder="Leave blank to keep"></label>
+<label>Broker host<input name="brokerHost" required placeholder="broker.example.com"></label><label>Broker port<input name="brokerPort" type="number" min="1" max="65535" value="443" required></label>
+<label>WebSocket path<input name="wsPath" value="/mqtt" required></label><label>MQTT Client ID<input name="clientId" maxlength="64" required></label>
+<label>MQTT username<input name="mqttUser" maxlength="64"></label><label>MQTT password<input name="mqttPassword" type="password" maxlength="64" autocomplete="new-password" placeholder="Leave blank to keep"></label>
+<label class="wide">MQTT topic prefix<input name="topicPrefix" maxlength="128" required></label>
+<label class="wide">TLS trusted CA certificate (PEM)<textarea name="tlsCaPem" rows="7" placeholder="-----BEGIN CERTIFICATE-----&#10;Paste the broker's trusted CA PEM. Leave blank to keep the current certificate."></textarea></label>
+<label>Setup AP SSID<input name="apSsid" maxlength="32"></label><label>Setup AP password<input name="apPassword" type="password" minlength="8" maxlength="63" placeholder="Leave blank to keep"></label>
+</div><h3>Universal IO channels</h3><p class="hint">Choose an available GPIO. GPIO0/2/15 affect boot and GPIO1/3 are UART pins. GPIO6–11 are unavailable.</p><div id="ioSettings"></div><button type="submit">Save settings & reboot</button><p id="saveResult" role="status"></p></form></section></main><script src="/app.js"></script></body></html>
