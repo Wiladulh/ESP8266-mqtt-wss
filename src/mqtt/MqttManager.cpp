@@ -4,9 +4,10 @@
 #include <ESP8266WiFi.h>
 #include <WebSocketsClient.h>
 #include <ArduinoJson.h>
+#include <time.h>
 
 static WebSocketsClient ws;
-static bool started=false,wsUp=false,mqttUp=false,connectSent=false,pingOutstanding=false;
+static bool started=false,wsUp=false,mqttUp=false,connectSent=false,pingOutstanding=false,ntpStarted=false;
 static unsigned long lastConnect=0,lastPing=0,lastStatePoll=0;
 static uint16_t packetId=1;
 static bool previousStates[10]={};
@@ -32,7 +33,7 @@ static void publish(const String& topic,const String& payload){
   uint8_t p[440];p[0]=0x30;size_t l=encLen(n,p+1);memcpy(p+1+l,b,n);ws.sendBIN(p,n+l+1);
 }
 static void receivePublish(const uint8_t* p,size_t len){
-  uint32_t rem;size_t l;if(!decLen(p+1,len-1,rem,l))return;size_t pos=1+l;if(pos+2>len)return;
+  uint32_t rem;size_t l;if(!decLen(p+1,len-1,rem,l)||rem>len-1-l)return;size_t pos=1+l;if(pos+2>len)return;
   uint16_t tl=(p[pos]<<8)|p[pos+1];pos+=2;if(pos+tl>len)return;String topic;
   for(uint16_t i=0;i<tl;i++)topic+=(char)p[pos++];uint8_t qos=(p[0]>>1)&3;if(qos)pos+=2;if(pos>len)return;
   String value;while(pos<len)value+=(char)p[pos++];value.trim();
@@ -46,8 +47,10 @@ static void onWs(WStype_t t,uint8_t* p,size_t n){
   if(t==WStype_CONNECTED){wsUp=true;mqttUp=false;connectSent=false;}
   else if(t==WStype_DISCONNECTED){wsUp=false;mqttUp=false;connectSent=false;pingOutstanding=false;}
   else if(t==WStype_BIN&&n>=2){
-    if(p[0]==0x20&&n>=4&&p[3]==0){mqttUp=true;subscribeCommands();publish(ConfigManager::get().topicPrefix+"/status","online");}
-    else if(p[0]==0xD0){pingOutstanding=false;lastPing=millis();}
+    if(p[0]==0x20&&n>=4){
+      if(p[3]==0){mqttUp=true;subscribeCommands();publish(ConfigManager::get().topicPrefix+"/status","online");lastPing=millis();}
+      else{mqttUp=false;connectSent=false;lastConnect=millis();}
+    } else if(p[0]==0xD0){pingOutstanding=false;lastPing=millis();}
     else if((p[0]&0xF0)==0x30)receivePublish(p,n);
   }
 }
@@ -55,7 +58,13 @@ namespace MqttManager {
 void begin(){}
 void loop(){
   const DeviceConfig& c=ConfigManager::get();
-  if(WiFi.status()!=WL_CONNECTED||!c.brokerHost.length()||!c.tlsCaPem.length()){
+  if(WiFi.status()!=WL_CONNECTED){
+    if(started){ws.disconnect();started=false;}wsUp=false;mqttUp=false;ntpStarted=false;return;
+  }
+  if(!ntpStarted){configTime(0,0,"pool.ntp.org","time.cloudflare.com");ntpStarted=true;}
+  // BearSSL validates certificate dates; never start WSS before SNTP provides a sane clock.
+  if(time(nullptr)<1700000000)return;
+  if(!c.brokerHost.length()||!c.tlsCaPem.length()){
     if(started){ws.disconnect();started=false;}wsUp=false;mqttUp=false;return;
   }
   if(!started){ws.beginSslWithCA(c.brokerHost.c_str(),c.brokerPort,c.wsPath.c_str(),c.tlsCaPem.c_str(),"mqtt");ws.onEvent(onWs);ws.setReconnectInterval(10000);started=true;lastConnect=millis();}
